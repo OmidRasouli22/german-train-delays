@@ -1,0 +1,10 @@
+# Stations to collect. One per line: EVA number, name
+# EVA numbers come from the DB API /station/ endpoint.
+8000107 Freiburg Hbf
+8000096 Stuttgart Hbf
+8000191 Karlsruhe Hbf
+8000244 Mannheim Hbf
+8000261 Muenchen Hbf
+8000284 Nuernberg Hbf
+8000170 Ulm Hbf
+8000156 Heidelberg Hbf

@@ -5,3 +5,4 @@ __pycache__/
 *.pb
 *.pb.gz
 .env
+collect_log.csv
