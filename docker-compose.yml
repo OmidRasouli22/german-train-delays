@@ -1,0 +1,9 @@
+services:
+  collector:
+    build: .
+    env_file: .env
+    volumes:
+      # Keep the data on the host, so it survives rebuilding the image.
+      - ./data:/app/data
+      - ./collect_log.csv:/app/collect_log.csv
+    restart: unless-stopped

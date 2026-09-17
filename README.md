@@ -60,6 +60,7 @@ Stop it with Ctrl+C.
 ```
 collect.py        the collector
 parse.py          turns saved files into a table
+health.py         shows what was collected and what is missing
 test_parse.py     tests
 stations.txt      which stations to watch
 .env              your API keys (never goes to GitHub)
@@ -137,6 +138,33 @@ changes, and making sure a cancelled train is not counted as a late one.
 
 They also check that the join never loses a planned train or creates extra
 rows, because both would quietly change every number built on top.
+
+## Checking the collection
+
+```
+python health.py
+```
+
+Shows every hour since collection started, how many rounds ran, and how many
+records arrived.
+
+This matters more than it looks. A collector that stops quietly is worse than
+one that crashes, because the numbers built on top still look fine. The report
+counts records rather than successful requests, because a reply can arrive
+with status 200 and hold no trains at all.
+
+Right now it runs on a laptop, so it stops when the machine sleeps. The report
+shows those gaps instead of hiding them.
+
+## Running it in Docker
+
+```
+docker compose up -d
+```
+
+The data folder is mounted from the host, so rebuilding the image keeps
+everything already collected. The container restarts by itself after a crash
+or a reboot.
 
 ## Next
 
