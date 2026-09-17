@@ -9,9 +9,11 @@ first part of this project is a small program that keeps saving it.
 
 ## What it does so far
 
-`collect.py` asks the Deutsche Bahn API what is happening at eight stations in
-southern Germany, and saves the answer to a file. It does this every two
-minutes, all day.
+`collect.py` asks the Deutsche Bahn API about eight stations in southern
+Germany and saves the answers. It runs all day.
+
+`parse.py` reads those saved files and builds a table of train stops with
+how late each one was.
 
 Stations: Freiburg, Stuttgart, Karlsruhe, Mannheim, Munich, Nuremberg, Ulm,
 Heidelberg.
@@ -53,16 +55,32 @@ Stop it with Ctrl+C.
 
 ```
 collect.py        the collector
+parse.py          turns saved files into a table
 stations.txt      which stations to watch
 .env              your API keys (never goes to GitHub)
 data/             the saved files
+stops.parquet     the table
 collect_log.csv   what was collected and when
 ```
 
-Files are saved as `data/2026-09-17/8000096_115833.xml.gz`. That is the
+Files are saved as `data/fchg/2026-09-17/8000096_115833.xml.gz`. That is the
 station number and the time, gzipped to save space.
 
 About 170 MB a day.
+
+## Two kinds of file
+
+The API answers two different questions and we need both.
+
+`plan` is the timetable: when a train is supposed to arrive. It only changes
+once an hour, so we ask for it once an hour.
+
+`fchg` is what changed: when the train will actually arrive. We ask every two
+minutes because it keeps changing.
+
+Neither is useful alone. The plan does not know about delays. The changes
+often give a new time without saying what the old one was. Joining them is
+what produces a delay.
 
 ## Why the files are saved raw
 
@@ -87,8 +105,22 @@ everything was fine while saving nothing.
 
 So the log counts records, not successful requests.
 
+## Making the table
+
+```
+python parse.py
+```
+
+This reads every file saved so far and writes `stops.parquet`. One row is one
+train at one station, either arriving or leaving, with how many minutes late
+it was.
+
+It reads everything from scratch each time. That is slower but it means a
+mistake in this script can be fixed and the table rebuilt correctly, because
+the saved files never change.
+
 ## Next
 
-- Read the saved files and turn them into a table
-- Work out the real delay for each train at each stop
-- Build daily punctuality numbers
+- Load the table into DuckDB and ask questions of it
+- Daily punctuality per station
+- A dashboard

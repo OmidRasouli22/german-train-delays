@@ -46,12 +46,11 @@ def read_stations(path="stations.txt"):
     return stations
 
 
-def fetch(eva, headers):
-    """Ask the API for all known changes at one station.
+def fetch(url, headers):
+    """Call the API. Returns (status, body).
 
-    Returns (status, body). Status is a number, or a short text on failure.
+    Status is a number, or a short text on failure.
     """
-    url = API + "/fchg/" + eva
     request = urllib.request.Request(url, headers=headers)
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
@@ -62,10 +61,10 @@ def fetch(eva, headers):
         return "error", str(e).encode()
 
 
-def save(eva, body, now):
-    """Write the response to a gzipped file, one folder per day."""
+def save(kind, eva, body, now):
+    """Write the response to a gzipped file, one folder per day and kind."""
     day = now.strftime("%Y-%m-%d")
-    folder = os.path.join(DATA_DIR, day)
+    folder = os.path.join(DATA_DIR, kind, day)
     os.makedirs(folder, exist_ok=True)
     name = eva + "_" + now.strftime("%H%M%S") + ".xml.gz"
     path = os.path.join(folder, name)
@@ -74,13 +73,13 @@ def save(eva, body, now):
     return path
 
 
-def log(now, eva, status, size, records):
+def log(now, kind, eva, status, size, records):
     """Add one line to the log file so we can see what was collected."""
     new_file = not os.path.exists(LOG_FILE)
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         if new_file:
-            f.write("time,eva,status,bytes,records\n")
-        f.write("%s,%s,%s,%d,%d\n" % (now.isoformat(), eva, status, size, records))
+            f.write("time,kind,eva,status,bytes,records\n")
+        f.write("%s,%s,%s,%s,%d,%d\n" % (now.isoformat(), kind, eva, status, size, records))
 
 
 def count_records(body):
@@ -92,30 +91,48 @@ def count_records(body):
     return body.count(b"<s id=")
 
 
-def run_once(stations, headers):
-    """Fetch every station once."""
+def collect(kind, url, eva, name, headers):
+    """Fetch one thing, save it, log it."""
+    now = datetime.now(timezone.utc)
+    status, body = fetch(url, headers)
+
+    if status == 200:
+        records = count_records(body)
+        save(kind, eva, body, now)
+    else:
+        records = 0
+
+    log(now, kind, eva, status, len(body), records)
+    print("%s %-5s %-16s %s  %d records"
+          % (now.strftime("%H:%M:%S"), kind, name, status, records))
+
+    if status == 401:
+        print("Credentials rejected. Check .env")
+        sys.exit(1)
+    if status == 429:
+        print("Rate limited. Waiting 60 seconds.")
+        time.sleep(60)
+
+    # Small gap so we stay well under the rate limit.
+    time.sleep(1)
+
+
+def run_once(stations, headers, with_plan):
+    """Fetch every station once.
+
+    Changes are fetched every round. The plan only changes once an hour,
+    so it is fetched less often.
+    """
     for eva, name in stations:
-        now = datetime.now(timezone.utc)
-        status, body = fetch(eva, headers)
+        collect("fchg", API + "/fchg/" + eva, eva, name, headers)
 
-        if status == 200:
-            records = count_records(body)
-            save(eva, body, now)
-        else:
-            records = 0
-
-        log(now, eva, status, len(body), records)
-        print("%s %-16s %s  %d records" % (now.strftime("%H:%M:%S"), name, status, records))
-
-        if status == 401:
-            print("Credentials rejected. Check .env")
-            sys.exit(1)
-        if status == 429:
-            print("Rate limited. Waiting 60 seconds.")
-            time.sleep(60)
-
-        # Small gap so we stay well under the rate limit.
-        time.sleep(1)
+    if with_plan:
+        now = datetime.now()
+        day = now.strftime("%y%m%d")
+        hour = now.strftime("%H")
+        for eva, name in stations:
+            url = "%s/plan/%s/%s/%s" % (API, eva, day, hour)
+            collect("plan", url, eva, name, headers)
 
 
 def main():
@@ -129,9 +146,18 @@ def main():
     print("Collecting %d stations every %d seconds. Ctrl+C to stop." % (len(stations), ROUND_SECONDS))
 
     once = "--once" in sys.argv
+    last_plan_hour = None
+
     while True:
         start = time.time()
-        run_once(stations, headers)
+
+        # Get the plan once per hour, changes every round.
+        this_hour = datetime.now().strftime("%Y%m%d%H")
+        with_plan = this_hour != last_plan_hour
+        run_once(stations, headers, with_plan)
+        if with_plan:
+            last_plan_hour = this_hour
+
         if once:
             return
         # Sleep the rest of the round.
