@@ -56,6 +56,7 @@ Stop it with Ctrl+C.
 ```
 collect.py        the collector
 parse.py          turns saved files into a table
+test_parse.py     tests
 stations.txt      which stations to watch
 .env              your API keys (never goes to GitHub)
 data/             the saved files
@@ -118,6 +119,20 @@ it was.
 It reads everything from scratch each time. That is slower but it means a
 mistake in this script can be fixed and the table rebuilt correctly, because
 the saved files never change.
+
+## Tests
+
+```
+pip install -r requirements.txt
+python -m pytest
+```
+
+The tests cover the parts that are easy to get wrong: reading the API time
+format, keeping only the newest version of a stop, joining the plan to the
+changes, and making sure a cancelled train is not counted as a late one.
+
+They also check that the join never loses a planned train or creates extra
+rows, because both would quietly change every number built on top.
 
 ## Next
 

@@ -112,6 +112,34 @@ def latest_only(table, columns):
     return table.drop_duplicates(subset=columns, keep="last")
 
 
+def build_stops(plan, changes):
+    """Join the timetable to the changes and work out the delays.
+
+    One row per train stop. A planned stop with no change ran on time.
+    """
+    key = ["stop_id", "event"]
+
+    # Keep the newest copy of each stop from both sides.
+    plan = latest_only(plan, key)
+    plan = plan[["stop_id", "event", "eva", "station", "planned", "line",
+                 "planned_platform", "train_type", "train_number"]]
+
+    changes = latest_only(changes, key)
+    changes = changes[["stop_id", "event", "actual", "actual_platform", "cancelled"]]
+
+    stops = plan.merge(changes, on=key, how="left")
+    stops["cancelled"] = stops["cancelled"].fillna(False).astype(bool)
+
+    # How late the train was, in minutes.
+    late = (stops["actual"] - stops["planned"]).dt.total_seconds() / 60
+    stops["delay_minutes"] = late.fillna(0).round().astype(int)
+
+    # A cancelled train is not late. It never ran.
+    stops.loc[stops["cancelled"], "delay_minutes"] = None
+
+    return stops
+
+
 def main():
     plan = read_all("plan")
     changes = read_all("fchg")
@@ -120,26 +148,7 @@ def main():
         print("No plan files yet. Let the collector run for an hour.")
         return
 
-    key = ["stop_id", "event"]
-
-    # The plan gives the timetable. Keep the newest copy of each stop.
-    plan = latest_only(plan, key)
-    plan = plan[["stop_id", "event", "eva", "station", "planned", "line",
-                 "planned_platform", "train_type", "train_number"]]
-
-    # The changes give the real times. Again keep the newest.
-    changes = latest_only(changes, key)
-    changes = changes[["stop_id", "event", "actual", "actual_platform", "cancelled"]]
-
-    # Join them. A planned stop with no change ran on time.
-    stops = plan.merge(changes, on=key, how="left")
-    stops["cancelled"] = stops["cancelled"].fillna(False).astype(bool)
-
-    # How late the train was, in minutes. Empty if we do not know yet.
-    late = (stops["actual"] - stops["planned"]).dt.total_seconds() / 60
-    stops["delay_minutes"] = late.fillna(0).round().astype(int)
-    stops.loc[stops["cancelled"], "delay_minutes"] = None
-
+    stops = build_stops(plan, changes)
     stops.to_parquet(OUT_FILE, index=False)
 
     print()
