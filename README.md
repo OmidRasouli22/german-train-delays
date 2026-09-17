@@ -7,6 +7,13 @@ morning?"
 The data is only available right now. If nobody saves it, it is gone. So the
 first part of this project is a small program that keeps saving it.
 
+Stations watched: Freiburg, Stuttgart, Karlsruhe, Mannheim, Munich, Nuremberg,
+Ulm, Heidelberg.
+
+**Status:** collecting. The numbers below come from a few hours of data, so
+they are a sample, not a punctuality statistic. They will be replaced once
+enough days have been collected.
+
 ## What it does so far
 
 `collect.py` asks the Deutsche Bahn API about eight stations in southern
@@ -14,9 +21,6 @@ Germany and saves the answers. It runs all day.
 
 `parse.py` reads those saved files and builds a table of train stops with
 how late each one was.
-
-Stations: Freiburg, Stuttgart, Karlsruhe, Mannheim, Munich, Nuremberg, Ulm,
-Heidelberg.
 
 ## Setup
 
