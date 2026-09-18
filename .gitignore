@@ -7,3 +7,4 @@ __pycache__/
 .env
 collect_log.csv
 stops.parquet
+events_*.parquet

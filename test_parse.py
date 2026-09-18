@@ -239,3 +239,16 @@ def test_after_midnight_belongs_to_the_day_before():
 
 def test_morning_train_is_its_own_day():
     assert service_date(read_time("2609180600")) == date(2026, 9, 18)
+
+
+def test_rows_record_which_file_they_came_from(tmp_path):
+    """Without this the script cannot tell which files it already read."""
+    path = write_xml(tmp_path, """
+        <timetable station="Freiburg Hbf" eva="8000107">
+          <s id="trip1"><ar pt="2609171605"/></s>
+        </timetable>
+    """.strip())
+
+    rows = read_file(path)
+
+    assert rows[0]["source"] == path

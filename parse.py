@@ -10,6 +10,7 @@ Run it any time. It reads everything from the start and rebuilds the table.
 import glob
 import gzip
 import os
+import sys
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -100,6 +101,7 @@ def read_file(path):
                 "train_number": train_number,
                 "cancelled": cancelled,
                 "fetched": fetched,
+                "source": path,
             })
 
     return rows
@@ -118,14 +120,42 @@ def eva_from_path(path):
     return os.path.basename(path).split("_")[0]
 
 
-def read_all(kind):
-    """Read every saved file of one kind into a table."""
+def cache_file(kind):
+    """Where the events read out of the saved files are kept."""
+    return "events_%s.parquet" % kind
+
+
+def read_all(kind, rebuild=False):
+    """Read the saved files of one kind into a table.
+
+    Files never change once written, so a file only needs reading once. The
+    events are kept in a parquet file and only new files are read after that.
+    Pass rebuild to read everything again, which is what you want after
+    changing how a file is read.
+    """
     paths = sorted(glob.glob(os.path.join(DATA_DIR, kind, "*", "*.xml.gz")))
+
+    old = pd.DataFrame()
+    done = set()
+    if not rebuild and os.path.exists(cache_file(kind)):
+        old = pd.read_parquet(cache_file(kind))
+        done = set(old["source"])
+
+    new_paths = [p for p in paths if p not in done]
+
     rows = []
-    for path in paths:
+    for path in new_paths:
         rows.extend(read_file(path))
-    print("%s: %d files, %d events" % (kind, len(paths), len(rows)))
-    return pd.DataFrame(rows)
+
+    new = pd.DataFrame(rows)
+    events = pd.concat([old, new], ignore_index=True) if len(new) else old
+
+    if len(new):
+        events.to_parquet(cache_file(kind), index=False)
+
+    print("%s: %d files (%d new), %d events"
+          % (kind, len(paths), len(new_paths), len(events)))
+    return events
 
 
 def latest_only(table, columns):
@@ -171,8 +201,11 @@ def build_stops(plan, changes):
 
 
 def main():
-    plan = read_all("plan")
-    changes = read_all("fchg")
+    # Reading a saved file again is only needed if this script changed.
+    rebuild = "--rebuild" in sys.argv
+
+    plan = read_all("plan", rebuild)
+    changes = read_all("fchg", rebuild)
 
     if plan.empty:
         print("No plan files yet. Let the collector run for an hour.")

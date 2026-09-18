@@ -68,6 +68,7 @@ stations.txt      which stations to watch
 .env              your API keys (never goes to GitHub)
 data/             the saved files
 stops.parquet     the table
+events_*.parquet  what has been read so far, so files are read once
 collect_log.csv   what was collected and when
 ```
 
@@ -123,9 +124,22 @@ This reads every file saved so far and writes `stops.parquet`. One row is one
 train at one station, either arriving or leaving, with how many minutes late
 it was.
 
-It reads everything from scratch each time. That is slower but it means a
-mistake in this script can be fixed and the table rebuilt correctly, because
-the saved files never change.
+A saved file never changes once written, so it only needs reading once. The
+events pulled out of it are kept in `events_fchg.parquet` and
+`events_plan.parquet`, and later runs only read files that are new.
+
+That took a run from about 90 seconds down to 10, and it stops growing with
+the size of the archive.
+
+If the reading itself changes, the old results are wrong and everything has
+to be read again:
+
+```
+python parse.py --rebuild
+```
+
+That still works because the saved files were never touched. It is the reason
+the collector stores the reply exactly as it arrived.
 
 ## Tests
 
