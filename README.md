@@ -184,6 +184,11 @@ Early findings, from a small sample:
 - Delays build through the morning, from under 4 minutes at 06:00 to over 5
   at 08:00.
 - Munich averages 8.7 minutes, Freiburg 1.9.
+- Most trains are fine. 77% arrive on time or within five minutes, and 2.5%
+  are more than half an hour late.
+- Counting cancellations changes the picture. Ulm reports 87% punctuality by
+  the official measure, but a third of its stops were cancelled, so only 57%
+  of scheduled stops actually ran on time.
 
 These come from two days of collection with gaps, so they show direction
 rather than fact. `health.py` shows which hours are actually covered.

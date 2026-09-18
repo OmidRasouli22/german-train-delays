@@ -41,13 +41,8 @@ order by hour_of_day;
 
 -- What actually happened at each station?
 -- A stop ends one of three ways: on time, late, or cancelled. A cancelled
--- train is not a late train, so it gets its own column rather than being
--- counted as very late.
---
 -- The official measure counts a train as on time under six minutes late and
 -- leaves cancelled trains out altogether. That is the number DB publishes.
--- The last column instead asks what share of everything that was supposed to
--- run did run on time, which is closer to what a passenger experienced.
 select
     station,
     count(*) as scheduled,
@@ -61,3 +56,23 @@ select
 from 'stops.parquet'
 group by station
 order by official desc;
+
+
+-- How are the delays spread out?
+-- An average hides the shape. Most trains are close to on time and a few are
+-- very late, so the bands say more than the mean does.
+select
+    case
+        when delay_minutes < 0 then 'early'
+        when delay_minutes = 0 then 'exactly on time'
+        when delay_minutes < 6 then '1 to 5 min'
+        when delay_minutes < 16 then '6 to 15 min'
+        when delay_minutes < 31 then '16 to 30 min'
+        else 'over 30 min'
+    end as band,
+    count(*) as stops,
+    round(100.0 * count(*) / sum(count(*)) over (), 1) as percent
+from 'stops.parquet'
+where delay_minutes is not null
+group by band
+order by min(delay_minutes);
