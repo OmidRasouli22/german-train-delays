@@ -61,6 +61,8 @@ Stop it with Ctrl+C.
 collect.py        the collector
 parse.py          turns saved files into a table
 health.py         shows what was collected and what is missing
+queries.sql       questions to ask the data
+ask.py            runs those questions
 test_parse.py     tests
 stations.txt      which stations to watch
 .env              your API keys (never goes to GitHub)
@@ -166,8 +168,28 @@ The data folder is mounted from the host, so rebuilding the image keeps
 everything already collected. The container restarts by itself after a crash
 or a reboot.
 
+## Asking questions
+
+```
+python ask.py
+```
+
+Runs everything in `queries.sql` and prints the answers. DuckDB reads the
+parquet file straight from disk, so there is no database to set up.
+
+Early findings, from a small sample:
+
+- Night trains are far worse than anything else. Nightjet averages 28 minutes
+  late against 6 for ICE and under 3 for S-Bahn.
+- Delays build through the morning, from under 4 minutes at 06:00 to over 5
+  at 08:00.
+- Munich averages 8.7 minutes, Freiburg 1.9.
+
+These come from two days of collection with gaps, so they show direction
+rather than fact. `health.py` shows which hours are actually covered.
+
 ## Next
 
-- Load the table into DuckDB and ask questions of it
+- Move the queries into dbt models with tests
 - Daily punctuality per station
 - A dashboard
