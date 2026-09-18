@@ -101,3 +101,19 @@ select
     count(*) filter (where departed > arrived) as lost_more
 from paired
 where arrived is not null and departed is not null;
+
+
+-- Which single stops were worst?
+-- Worth looking at now and then. A delay of several hours is usually a real
+-- train, but it can also be a sign that something was parsed wrong.
+select
+    train_type,
+    train_number,
+    station,
+    event,
+    planned,
+    delay_minutes
+from 'stops.parquet'
+where delay_minutes is not null
+order by delay_minutes desc
+limit 10;

@@ -189,6 +189,8 @@ Early findings, from a small sample:
 - Counting cancellations changes the picture. Ulm reports 87% punctuality by
   the official measure, but a third of its stops were cancelled, so only 57%
   of scheduled stops actually ran on time.
+- Trains do not make up time at stations. Pairing the arrival and departure of
+  the same train shows a small loss, not a gain.
 
 These come from two days of collection with gaps, so they show direction
 rather than fact. `health.py` shows which hours are actually covered.
