@@ -37,3 +37,27 @@ where delay_minutes is not null
 group by hour_of_day
 having count(*) >= 20
 order by hour_of_day;
+
+
+-- What actually happened at each station?
+-- A stop ends one of three ways: on time, late, or cancelled. A cancelled
+-- train is not a late train, so it gets its own column rather than being
+-- counted as very late.
+--
+-- The official measure counts a train as on time under six minutes late and
+-- leaves cancelled trains out altogether. That is the number DB publishes.
+-- The last column instead asks what share of everything that was supposed to
+-- run did run on time, which is closer to what a passenger experienced.
+select
+    station,
+    count(*) as scheduled,
+    count(*) filter (where delay_minutes < 6) as on_time,
+    count(*) filter (where delay_minutes >= 6) as late,
+    count(*) filter (where cancelled) as cancelled,
+    round(100.0 * count(*) filter (where delay_minutes < 6)
+          / nullif(count(*) filter (where not cancelled), 0), 1) as official,
+    round(100.0 * count(*) filter (where delay_minutes < 6)
+          / count(*), 1) as share_of_all
+from 'stops.parquet'
+group by station
+order by official desc;
