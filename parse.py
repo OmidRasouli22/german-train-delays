@@ -11,19 +11,45 @@ import glob
 import gzip
 import os
 import xml.etree.ElementTree as ET
-from datetime import datetime
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
 DATA_DIR = "data"
 OUT_FILE = "stops.parquet"
 
+# The API sends German local times. Keeping them German means an hour in the
+# data is the hour a passenger stood on the platform.
+GERMAN_TIME = ZoneInfo("Europe/Berlin")
+
+# A train leaving at 00:30 belongs to the day before. Railways count the day
+# as running past midnight, so nights are not split in two.
+SERVICE_DAY_STARTS_AT = 3
+
 
 def read_time(text):
-    """Turn an API time like 2609171605 into a real date and time."""
+    """Turn an API time like 2609171605 into a real date and time.
+
+    The clock changes twice a year. Saying which timezone this is means an
+    hour before the October change and an hour after it still line up.
+    """
     if not text:
         return None
-    return datetime.strptime(text, "%y%m%d%H%M")
+    return datetime.strptime(text, "%y%m%d%H%M").replace(tzinfo=GERMAN_TIME)
+
+
+def service_date(when):
+    """Which day of service a time belongs to.
+
+    Anything before 03:00 counts as the day before, so a train running at
+    00:30 stays with the evening it started in.
+    """
+    if when is None or pd.isna(when):
+        return None
+    if when.hour < SERVICE_DAY_STARTS_AT:
+        return (when - timedelta(days=1)).date()
+    return when.date()
 
 
 def read_file(path):
@@ -130,7 +156,11 @@ def build_stops(plan, changes):
     stops = plan.merge(changes, on=key, how="left")
     stops["cancelled"] = stops["cancelled"].fillna(False).astype(bool)
 
-    # How late the train was, in minutes.
+    # Which day of service the stop belongs to.
+    stops["service_date"] = stops["planned"].map(service_date)
+
+    # How late the train was, in minutes. Both times carry a timezone, so
+    # the clock change in October does not turn into a one hour delay.
     late = (stops["actual"] - stops["planned"]).dt.total_seconds() / 60
     stops["delay_minutes"] = late.fillna(0).round().astype(int)
 

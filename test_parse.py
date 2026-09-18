@@ -1,15 +1,16 @@
 """Tests for the parsing and delay logic."""
 
 import gzip
-from datetime import datetime
+from datetime import date, datetime
 
 import pandas as pd
 
-from parse import build_stops, eva_from_path, file_time, latest_only, read_file, read_time
+from parse import (GERMAN_TIME, build_stops, eva_from_path, file_time,
+                   latest_only, read_file, read_time, service_date)
 
 
 def test_read_time():
-    assert read_time("2609171605") == datetime(2026, 9, 17, 16, 5)
+    assert read_time("2609171605") == datetime(2026, 9, 17, 16, 5, tzinfo=GERMAN_TIME)
 
 
 def test_read_time_empty():
@@ -53,8 +54,8 @@ def test_read_file_arrival_and_departure(tmp_path):
     assert len(rows) == 2
     assert rows[0]["event"] == "arrival"
     assert rows[1]["event"] == "departure"
-    assert rows[0]["planned"] == datetime(2026, 9, 17, 16, 5)
-    assert rows[0]["actual"] == datetime(2026, 9, 17, 16, 36)
+    assert rows[0]["planned"] == datetime(2026, 9, 17, 16, 5, tzinfo=GERMAN_TIME)
+    assert rows[0]["actual"] == datetime(2026, 9, 17, 16, 36, tzinfo=GERMAN_TIME)
 
 
 def test_read_file_marks_cancelled(tmp_path):
@@ -197,3 +198,44 @@ def test_delay_across_midnight():
     stops = build_stops(plan, changes)
 
     assert stops.iloc[0]["delay_minutes"] == 15
+
+
+def test_times_are_german_not_utc():
+    """The API sends German local time. It must stay German."""
+    t = read_time("2609180900")
+
+    assert t.hour == 9
+    assert t.utcoffset().total_seconds() == 2 * 3600  # summer time
+
+
+def test_winter_time_offset_changes():
+    """After the October change the offset is one hour, not two."""
+    summer = read_time("2609180900")
+    winter = read_time("2611010900")
+
+    assert summer.utcoffset().total_seconds() == 2 * 3600
+    assert winter.utcoffset().total_seconds() == 1 * 3600
+    assert summer.hour == winter.hour == 9
+
+
+def test_delay_is_not_broken_by_the_clock_change():
+    """A train running through the October change is not an hour late."""
+    plan = make_plan(planned=read_time("2610250145"))
+    changes = make_changes(actual=read_time("2610250150"))
+
+    stops = build_stops(plan, changes)
+
+    assert stops.iloc[0]["delay_minutes"] == 5
+
+
+def test_service_date_of_an_evening_train():
+    assert service_date(read_time("2609172230")) == date(2026, 9, 17)
+
+
+def test_after_midnight_belongs_to_the_day_before():
+    """A train at 00:30 is part of the evening it started in."""
+    assert service_date(read_time("2609180030")) == date(2026, 9, 17)
+
+
+def test_morning_train_is_its_own_day():
+    assert service_date(read_time("2609180600")) == date(2026, 9, 18)
