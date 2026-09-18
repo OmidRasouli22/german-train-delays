@@ -76,3 +76,28 @@ from 'stops.parquet'
 where delay_minutes is not null
 group by band
 order by min(delay_minutes);
+
+
+-- Do trains make up time while standing at a platform?
+-- Comparing all arrivals against all departures does not answer this, because
+-- they are different trains. A train starting its journey here departs on
+-- time and has no delay to recover, which flatters the departure average.
+-- So this pairs the arrival and the departure of the same train instead.
+with paired as (
+    select
+        stop_id,
+        max(delay_minutes) filter (where event = 'arrival') as arrived,
+        max(delay_minutes) filter (where event = 'departure') as departed
+    from 'stops.parquet'
+    where delay_minutes is not null
+    group by stop_id
+)
+select
+    count(*) as trains,
+    round(avg(arrived), 1) as avg_arrival,
+    round(avg(departed), 1) as avg_departure,
+    round(avg(departed - arrived), 1) as avg_change,
+    count(*) filter (where departed < arrived) as made_up_time,
+    count(*) filter (where departed > arrived) as lost_more
+from paired
+where arrived is not null and departed is not null;
