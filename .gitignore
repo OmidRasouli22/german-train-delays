@@ -8,3 +8,8 @@ __pycache__/
 collect_log.csv
 stops.parquet
 events_*.parquet
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/
+*.duckdb
+dbt/.user.yml

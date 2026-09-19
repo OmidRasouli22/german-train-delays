@@ -1,0 +1,19 @@
+name: trains
+version: 1.0.0
+
+# "This project is called trains, 
+# connect using the trains profile, and my SQL files are in the models folder."
+profile: trains
+
+model-paths: ["models"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  trains:
+    # Staging models stay as views. They are cheap and always current.
+    staging:
+      +materialized: view
+    # The rest become real tables, because they are what gets queried.
+    marts:
+      +materialized: table

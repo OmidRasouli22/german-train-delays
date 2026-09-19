@@ -1,0 +1,15 @@
+version: 2
+
+# Where the raw data comes from. parse.py writes these files, dbt reads them.
+# Naming them here means a model refers to source('rail', 'plan') rather than
+# a file path, so moving the files later only changes this one place.
+sources:
+  - name: rail
+    description: Events read out of the saved API replies by parse.py
+    meta:
+      external_location: "../events_{name}.parquet"
+    tables:
+      - name: plan
+        description: The timetable. What time a train was supposed to arrive.
+      - name: fchg
+        description: Changes. What time it actually arrived.

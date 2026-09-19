@@ -209,8 +209,25 @@ Early findings, from a small sample:
 These come from two days of collection with gaps, so they show direction
 rather than fact. `health.py` shows which hours are actually covered.
 
+## dbt
+
+The queries are being moved into dbt models, so each step is a file and dbt
+works out what order to run them in.
+
+```
+cd dbt
+dbt run
+```
+
+So far there are two staging models. Both keep only the newest version of
+each stop, because the same train is fetched again every two minutes.
+
+- `stg_plan` is the timetable, and the train type and number
+- `stg_changes` is what actually happened
+
 ## Next
 
-- Move the queries into dbt models with tests
+- Join the two into one table of delays
+- Add tests on the data, not just the code
 - Daily punctuality per station
 - A dashboard
