@@ -37,3 +37,23 @@ models:
         description: Station name, used for grouping.
         tests:
           - not_null
+
+  - name: agg_station_daily
+    description: >
+      One row per station per day. This is what a dashboard reads.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - service_date
+              - station
+
+    columns:
+      - name: service_date
+        tests:
+          - not_null
+      - name: station
+        tests:
+          - not_null
+      - name: punctuality
+        description: Share of trains that ran and were under six minutes late.

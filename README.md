@@ -97,9 +97,12 @@ For the dbt models:
 ```
 cd dbt
 dbt deps
-dbt run
-dbt test
+dbt build
 ```
+
+The stops table is built a day at a time rather than all at once. A train
+keeps getting updated for hours after it was due, so the last two days are
+rebuilt every run and anything older is left alone.
 
 ## Checking it is still collecting
 
@@ -119,7 +122,7 @@ afternoon before I stopped the laptop sleeping.
 
 ```
 python -m pytest         29 tests, run on every push
-cd dbt && dbt test        8 tests, run on the collected data
+cd dbt && dbt build      4 models and 12 tests on the collected data
 ```
 
 The python tests check the code. The dbt tests check the data, like no two

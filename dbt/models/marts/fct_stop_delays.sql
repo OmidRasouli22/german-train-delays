@@ -7,9 +7,28 @@
 -- The join is a left join on purpose. Most trains never appear in the
 -- changes at all, and that silence means they ran as planned. An inner join
 -- would quietly throw away every punctual train.
+--
+-- Built one day at a time instead of all at once. A train keeps being
+-- updated for hours after it was due, so the last two days are always
+-- rebuilt rather than only the new rows. Anything older than that has
+-- stopped changing.
+
+{{
+    config(
+        materialized='incremental',
+        unique_key=['stop_id', 'event'],
+        incremental_strategy='delete+insert'
+    )
+}}
 
 with plan as (
+
     select * from {{ ref('stg_plan') }}
+
+    {% if is_incremental() %}
+    where planned >= current_date - interval 2 day
+    {% endif %}
+
 ),
 
 changes as (
