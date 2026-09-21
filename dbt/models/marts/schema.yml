@@ -1,0 +1,15 @@
+version: 2
+
+models:
+  - name: fct_stop_delays
+    description: >
+      One row per train, per station, per arrival or departure.
+      This is the table the questions get asked of.
+    tests:
+      # The grain. Two rows for the same stop and event would quietly
+      # double every count and shift every average.
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - stop_id
+              - event

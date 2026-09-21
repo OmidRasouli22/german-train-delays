@@ -221,6 +221,19 @@ Three models so far.
 The two staging models keep only the newest version of each stop, because
 the same train is fetched again every two minutes.
 
+```
+dbt deps
+dbt test
+```
+
+`dbt test` checks the collected data rather than the code. The first check is
+that no two rows describe the same stop, since that would quietly double
+every count.
+
+These run on the machine holding the data, not in GitHub Actions, because
+the collected files are not in the repo. The python tests in `test_parse.py`
+are the ones that run on every push.
+
 ## Next
 
 - Add tests on the data, not just the code
