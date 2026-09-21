@@ -74,9 +74,6 @@ def read_file(path):
     for stop in root.findall("s"):
         stop_id = stop.get("id")
 
-        # A message with t="c" means the train was cancelled.
-        cancelled = any(m.get("t") == "c" for m in stop.findall("m"))
-
         # Train details are only in the plan files.
         train = stop.find("tl")
         train_type = train.get("c") if train is not None else None
@@ -86,6 +83,11 @@ def read_file(path):
             event = stop.find(kind)
             if event is None:
                 continue
+
+            # cs="c" on the arrival or departure means this stop was
+            # cancelled. The <m> messages are about disruptions and say
+            # nothing about whether the train ran.
+            cancelled = event.get("cs") == "c"
 
             rows.append({
                 "stop_id": stop_id,

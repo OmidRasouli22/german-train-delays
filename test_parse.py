@@ -59,11 +59,11 @@ def test_read_file_arrival_and_departure(tmp_path):
 
 
 def test_read_file_marks_cancelled(tmp_path):
+    """A cancelled stop is marked with cs="c" on the arrival or departure."""
     path = write_xml(tmp_path, """
         <timetable station="Freiburg Hbf" eva="8000107">
           <s id="trip1">
-            <m id="m1" t="c"/>
-            <ar pt="2609171605"/>
+            <ar pt="2609171605" cs="c" clt="2609171610"/>
           </s>
         </timetable>
     """.strip())
@@ -71,6 +71,22 @@ def test_read_file_marks_cancelled(tmp_path):
     rows = read_file(path)
 
     assert rows[0]["cancelled"] is True
+
+
+def test_disruption_message_is_not_a_cancellation(tmp_path):
+    """An <m> message means a disruption. The train still ran."""
+    path = write_xml(tmp_path, """
+        <timetable station="Freiburg Hbf" eva="8000107">
+          <s id="trip1">
+            <m id="m1" t="c"/>
+            <ar pt="2609171605" ct="2609171630"/>
+          </s>
+        </timetable>
+    """.strip())
+
+    rows = read_file(path)
+
+    assert rows[0]["cancelled"] is False
 
 
 def test_read_file_keeps_umlauts(tmp_path):

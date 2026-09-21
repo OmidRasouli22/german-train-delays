@@ -191,23 +191,16 @@ python ask.py
 Runs everything in `queries.sql` and prints the answers. DuckDB reads the
 parquet file straight from disk, so there is no database to set up.
 
-Early findings, from a small sample:
+Findings from five days of collection (17 to 21 September):
 
-- Night trains are far worse than anything else. Nightjet averages 28 minutes
-  late against 6 for ICE and under 3 for S-Bahn.
-- Delays build through the morning, from under 4 minutes at 06:00 to over 5
-  at 08:00.
-- Munich averages 8.7 minutes, Freiburg 1.9.
-- Most trains are fine. 77% arrive on time or within five minutes, and 2.5%
-  are more than half an hour late.
-- Counting cancellations changes the picture. Ulm reports 87% punctuality by
-  the official measure, but a third of its stops were cancelled, so only 57%
-  of scheduled stops actually ran on time.
-- Trains do not make up time at stations. Pairing the arrival and departure of
-  the same train shows a small loss, not a gain.
-
-These come from two days of collection with gaps, so they show direction
-rather than fact. `health.py` shows which hours are actually covered.
+- Punctuality varies a lot by station. Freiburg is on time 87% of the time,
+  Stuttgart 64%.
+- Night trains are the worst by far, averaging around half an hour late,
+  against about 6 minutes for ICE and under 3 for S-Bahn.
+- Most trains are fine. Around three quarters arrive within five minutes.
+  A small number are very late and those are what people remember.
+These come from five days, so they show direction rather than settled fact.
+`health.py` shows which hours are actually covered.
 
 ## dbt
 
@@ -219,15 +212,18 @@ cd dbt
 dbt run
 ```
 
-So far there are two staging models. Both keep only the newest version of
-each stop, because the same train is fetched again every two minutes.
+Three models so far.
 
 - `stg_plan` is the timetable, and the train type and number
 - `stg_changes` is what actually happened
+- `fct_stop_delays` joins the two and works out how late each train was
+
+The two staging models keep only the newest version of each stop, because
+the same train is fetched again every two minutes.
 
 ## Next
 
-- Join the two into one table of delays
 - Add tests on the data, not just the code
+- Daily punctuality per station
 - Daily punctuality per station
 - A dashboard
