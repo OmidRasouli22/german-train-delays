@@ -226,9 +226,10 @@ dbt deps
 dbt test
 ```
 
-`dbt test` checks the collected data rather than the code. The first check is
-that no two rows describe the same stop, since that would quietly double
-every count.
+`dbt test` checks the collected data rather than the code. It checks that no
+two rows describe the same stop, that the columns everything depends on are
+filled in, that a cancelled train has no delay, and that no delay is so large
+it must be a misread time.
 
 These run on the machine holding the data, not in GitHub Actions, because
 the collected files are not in the repo. The python tests in `test_parse.py`

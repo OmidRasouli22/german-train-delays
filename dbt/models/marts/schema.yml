@@ -13,3 +13,27 @@ models:
             combination_of_columns:
               - stop_id
               - event
+
+    columns:
+      - name: stop_id
+        description: The trip this stop belongs to.
+        tests:
+          - not_null
+
+      - name: event
+        description: Whether the train was arriving or leaving.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['arrival', 'departure']
+
+      - name: planned
+        description: When the train was due. Without it there is no delay.
+        tests:
+          - not_null
+
+      - name: station
+        description: Station name, used for grouping.
+        tests:
+          - not_null
