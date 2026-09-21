@@ -1,243 +1,191 @@
 # German Train Delays
 
-Collects live train delay data from Deutsche Bahn and turns it into tables you
-can ask questions of, like "which station has the worst delays on a Monday
-morning?"
+Deutsche Bahn publishes what its trains are doing right now. A few minutes
+later that information is gone, overwritten by the next update. Nobody can
+tell you later what the board said this morning.
 
-The data is only available right now. If nobody saves it, it is gone. So the
-first part of this project is a small program that keeps saving it.
+This project saves it, every two minutes, and turns it into tables you can
+ask questions of.
 
-Stations watched: Freiburg, Stuttgart, Karlsruhe, Mannheim, Munich, Nuremberg,
-Ulm, Heidelberg.
+Eight stations in southern Germany: Freiburg, Stuttgart, Karlsruhe, Mannheim,
+Munich, Nuremberg, Ulm, Heidelberg.
 
-**Status:** collecting. The numbers below come from a few hours of data, so
-they are a sample, not a punctuality statistic. They will be replaced once
-enough days have been collected.
+## What the data shows
 
-## What it does so far
+Delays are lowest at six in the morning and grow all day. A train in the
+evening is three times later than the same train at dawn, because delays
+pass from one train to the next and nothing resets until the night.
 
-`collect.py` asks the Deutsche Bahn API about eight stations in southern
-Germany and saves the answers. It runs all day.
+![Delay by hour](charts/delay_by_hour.png)
 
-`parse.py` reads those saved files and builds a table of train stops with
-how late each one was.
+Where you stand matters more than when. Freiburg averages under three
+minutes, Munich eight.
 
-## Setup
+![Delay by station](charts/delay_by_station.png)
 
-You need a free API key from
-[developers.deutschebahn.com](https://developers.deutschebahn.com).
-Create an account, create an application, then subscribe that application to
-the "Timetables" API and pick the free plan.
+Most trains are fine. Three quarters arrive within five minutes. The ones
+people remember are the four percent that are more than half an hour late.
 
-Copy your keys into a file called `.env`:
+![How delays are spread](charts/delay_spread.png)
 
-```
-cp .env.example .env
-```
+Night trains are worst of all, around half an hour late on average, against
+six minutes for ICE and under three for S-Bahn. They cross several countries
+overnight and collect delay the whole way.
 
-Then edit `.env` and paste in your client id and secret.
+Numbers are from 22,930 stops collected between 17 and 21 September 2026.
 
-## Running it
-
-Test that it works:
+## How it works
 
 ```
-python collect.py --once
+Deutsche Bahn API
+       |
+       |  every 2 minutes
+       v
+   collect.py  ---->  data/        saved replies, never changed
+       |
+       |  reads each file once
+       v
+    parse.py  ---->  events_*.parquet
+       |
+       v
+      dbt      ---->  trains.duckdb
+       |
+       +-- stg_plan          the timetable
+       +-- stg_changes       what really happened
+       +-- fct_stop_delays   the two joined, with the delay worked out
 ```
 
-You should see eight lines, one per station, each with a number of records.
+### Collecting
 
-Leave it running:
+The API answers two different questions and both are needed.
 
-```
-python collect.py
-```
+**The plan** is the timetable: what time a train is due. It changes once an
+hour, so it is asked for once an hour.
 
-Stop it with Ctrl+C.
+**The changes** are what actually happened: the new arrival time. This is
+asked for every two minutes because it keeps changing.
 
-## Where things go
+Neither is any use alone. The plan does not know about delays. The changes
+usually give a new time without saying what the old one was. The delay only
+appears when the two are put side by side.
 
-```
-collect.py        the collector
-parse.py          turns saved files into a table
-health.py         shows what was collected and what is missing
-queries.sql       questions to ask the data
-ask.py            runs those questions
-test_parse.py     tests
-stations.txt      which stations to watch
-.env              your API keys (never goes to GitHub)
-data/             the saved files
-stops.parquet     the table
-events_*.parquet  what has been read so far, so files are read once
-collect_log.csv   what was collected and when
-```
+### Saving replies as they arrive
 
-Files are saved as `data/fchg/2026-09-17/8000096_115833.xml.gz`. That is the
-station number and the time, gzipped to save space.
+`collect.py` saves the answer from the API exactly as it came, without
+reading it. That looks lazy and is on purpose.
 
-About 170 MB a day.
-
-## Two kinds of file
-
-The API answers two different questions and we need both.
-
-`plan` is the timetable: when a train is supposed to arrive. It only changes
-once an hour, so we ask for it once an hour.
-
-`fchg` is what changed: when the train will actually arrive. We ask every two
-minutes because it keeps changing.
-
-Neither is useful alone. The plan does not know about delays. The changes
-often give a new time without saying what the old one was. Joining them is
-what produces a delay.
-
-## Why the files are saved raw
-
-The collector saves the answer from the API exactly as it arrives, without
-reading it. That seems lazy but it is on purpose.
-
-Later, the data gets read and turned into tables. That reading step will have
-mistakes in it. When a mistake is found, the saved files can be read again
-with the fixed code. Nothing is lost.
-
-If the collector read the data itself and saved only the result, a mistake
-would be permanent.
-
-## One thing that surprised me
-
-A reply from a server can say "OK" and contain nothing at all.
-
-While looking for a data source I found one that answered every request
-successfully, with a valid response and a fresh timestamp, and zero trains
-inside. A program checking only whether requests succeeded would have reported
-everything was fine while saving nothing.
-
-So the log counts records, not successful requests.
-
-## Making the table
-
-```
-python parse.py
-```
-
-This reads every file saved so far and writes `stops.parquet`. One row is one
-train at one station, either arriving or leaving, with how many minutes late
-it was.
-
-A saved file never changes once written, so it only needs reading once. The
-events pulled out of it are kept in `events_fchg.parquet` and
-`events_plan.parquet`, and later runs only read files that are new.
-
-That took a run from about 90 seconds down to 10, and it stops growing with
-the size of the archive.
-
-If the reading itself changes, the old results are wrong and everything has
-to be read again:
+Reading the data is where mistakes happen. Early on, a disruption message was
+read as a cancellation, which marked 1,349 trains as cancelled when they had
+actually run. Fixing it took one command, because every original reply was
+still on disk:
 
 ```
 python parse.py --rebuild
 ```
 
-That still works because the saved files were never touched. It is the reason
-the collector stores the reply exactly as it arrived.
+If the collector had read the replies and saved only the result, those trains
+would have been wrong forever.
 
-## Tests
+### Working out the delay
+
+The same train is fetched again every two minutes, so one stop shows up in
+hundreds of files, each with a newer guess. Only the last one is true.
+
+After that the timetable is joined to the changes. The join keeps every
+planned train, including the ones that never appear in the changes at all,
+because that silence means the train ran on time. Dropping them would delete
+every punctual train and make the numbers look far worse than they are.
+
+A cancelled train gets no delay. It was not late, it never ran.
+
+## Running it
+
+You need a free API key from
+[developers.deutschebahn.com](https://developers.deutschebahn.com). Create an
+account, create an application, then subscribe that application to the
+Timetables API and pick the free plan. Creating the application is not enough
+on its own, the subscription is a separate step.
 
 ```
 pip install -r requirements.txt
-python -m pytest
+cp .env.example .env
 ```
 
-The tests cover the parts that are easy to get wrong: reading the API time
-format, keeping only the newest version of a stop, joining the plan to the
-changes, and making sure a cancelled train is not counted as a late one.
-
-They also check that the join never loses a planned train or creates extra
-rows, because both would quietly change every number built on top.
-
-## Checking the collection
+Put your client id and secret in `.env`, then:
 
 ```
-python health.py
+python collect.py        collect, leave it running
+python parse.py          build the table
+python health.py         see what was collected and what is missing
+python make_charts.py    redraw the charts
 ```
 
-Shows every hour since collection started, how many rounds ran, and how many
-records arrived.
-
-This matters more than it looks. A collector that stops quietly is worse than
-one that crashes, because the numbers built on top still look fine. The report
-counts records rather than successful requests, because a reply can arrive
-with status 200 and hold no trains at all.
-
-Right now it runs on a laptop, so it stops when the machine sleeps. The report
-shows those gaps instead of hiding them.
-
-## Running it in Docker
-
-```
-docker compose up -d
-```
-
-The data folder is mounted from the host, so rebuilding the image keeps
-everything already collected. The container restarts by itself after a crash
-or a reboot.
-
-## Asking questions
-
-```
-python ask.py
-```
-
-Runs everything in `queries.sql` and prints the answers. DuckDB reads the
-parquet file straight from disk, so there is no database to set up.
-
-Findings from five days of collection (17 to 21 September):
-
-- Punctuality varies a lot by station. Freiburg is on time 87% of the time,
-  Stuttgart 64%.
-- Night trains are the worst by far, averaging around half an hour late,
-  against about 6 minutes for ICE and under 3 for S-Bahn.
-- Most trains are fine. Around three quarters arrive within five minutes.
-  A small number are very late and those are what people remember.
-These come from five days, so they show direction rather than settled fact.
-`health.py` shows which hours are actually covered.
-
-## dbt
-
-The queries are being moved into dbt models, so each step is a file and dbt
-works out what order to run them in.
+For the dbt models:
 
 ```
 cd dbt
-dbt run
-```
-
-Three models so far.
-
-- `stg_plan` is the timetable, and the train type and number
-- `stg_changes` is what actually happened
-- `fct_stop_delays` joins the two and works out how late each train was
-
-The two staging models keep only the newest version of each stop, because
-the same train is fetched again every two minutes.
-
-```
 dbt deps
+dbt run
 dbt test
 ```
 
-`dbt test` checks the collected data rather than the code. It checks that no
-two rows describe the same stop, that the columns everything depends on are
-filled in, that a cancelled train has no delay, and that no delay is so large
-it must be a misread time.
+## Checking the collection
 
-These run on the machine holding the data, not in GitHub Actions, because
-the collected files are not in the repo. The python tests in `test_parse.py`
-are the ones that run on every push.
+A collector that stops quietly is worse than one that crashes, because the
+numbers built on top still look fine.
+
+`health.py` shows every hour since collection started, how many rounds ran,
+and how many records arrived. It counts records rather than successful
+requests, because a reply can arrive with status 200 and hold nothing at all.
+
+That is not a made up worry. While looking for a data source, one feed
+answered every request successfully, with a valid reply and a fresh
+timestamp, and no trains inside. A program checking only whether requests
+succeeded would have reported everything was fine while saving nothing.
+
+Collection so far is 2,655 rounds out of 2,820 expected. All the missing
+hours are from one afternoon before the laptop was set not to sleep. Since
+then it has not missed an hour.
+
+## Tests
+
+Two kinds, and they catch different things.
+
+```
+python -m pytest         29 tests, on every push
+cd dbt && dbt test        8 tests, on the collected data
+```
+
+The python tests check the code: that a cancelled train gets no delay, that
+the join never loses a planned train, that a delay over midnight is fifteen
+minutes and not a negative day.
+
+The dbt tests check the data itself: that no two rows describe the same stop,
+that the columns everything depends on are filled in, that no delay is so
+large it must be a misread time.
+
+Both are needed. Every python test passed while the cancellation bug was in
+the data, because they test the logic, not what the logic was fed.
+
+The dbt tests need the collected files, so they run on the machine holding
+the data. The python tests run in GitHub Actions on every push.
+
+## Files
+
+```
+collect.py        asks the API and saves the replies
+parse.py          turns saved replies into a table
+health.py         shows what was collected and what is missing
+make_charts.py    draws the charts above
+queries.sql       questions, as plain SQL
+ask.py            runs those questions
+stations.txt      which stations to watch
+dbt/              the same work as models, with tests
+data/             the saved replies, about 150 MB a day
+```
 
 ## Next
 
-- Add tests on the data, not just the code
-- Daily punctuality per station
-- Daily punctuality per station
-- A dashboard
+- Schedule the whole thing with Airflow
+- A page showing punctuality per station per day
+- Predict how late a train will be at its next stop
