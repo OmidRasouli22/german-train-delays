@@ -1,38 +1,34 @@
 # German Train Delays
 
-Deutsche Bahn publishes what its trains are doing right now. A few minutes
-later that information is gone, overwritten by the next update. Nobody can
-tell you later what the board said this morning.
+Deutsche Bahn shows what its trains are doing right now, and a few minutes
+later that information is gone. I wanted to know how late trains actually
+are, so I started saving it every two minutes.
 
-This project saves it, every two minutes, and turns it into tables you can
-ask questions of.
-
-Eight stations in southern Germany: Freiburg, Stuttgart, Karlsruhe, Mannheim,
+Eight stations in the south: Freiburg, Stuttgart, Karlsruhe, Mannheim,
 Munich, Nuremberg, Ulm, Heidelberg.
 
-## What the data shows
+## What I found
 
-Delays are lowest at six in the morning and grow all day. A train in the
-evening is three times later than the same train at dawn, because delays
-pass from one train to the next and nothing resets until the night.
+Delays are smallest early in the morning and grow all day. By eight in the
+evening a train is about three times later than the same train at six in the
+morning. Late trains make the next train late, and it only resets overnight.
 
 ![Delay by hour](charts/delay_by_hour.png)
 
-Where you stand matters more than when. Freiburg averages under three
-minutes, Munich eight.
+Which station you are at matters more than I expected. Freiburg is under
+three minutes on average, Munich is eight.
 
 ![Delay by station](charts/delay_by_station.png)
 
-Most trains are fine. Three quarters arrive within five minutes. The ones
-people remember are the four percent that are more than half an hour late.
+Most trains are fine though. Three quarters are within five minutes. It is
+the four percent over half an hour that people remember.
 
 ![How delays are spread](charts/delay_spread.png)
 
-Night trains are worst of all, around half an hour late on average, against
-six minutes for ICE and under three for S-Bahn. They cross several countries
-overnight and collect delay the whole way.
+Night trains are the worst by a long way, around half an hour on average.
+ICE is about six minutes, S-Bahn under three.
 
-Numbers are from 22,930 stops collected between 17 and 21 September 2026.
+From 22,930 stops between 17 and 21 September 2026.
 
 ## How it works
 
@@ -41,70 +37,47 @@ Deutsche Bahn API
        |
        |  every 2 minutes
        v
-   collect.py  ---->  data/        saved replies, never changed
+   collect.py  ---->  data/     saved replies, never changed
        |
-       |  reads each file once
        v
     parse.py  ---->  events_*.parquet
        |
        v
       dbt      ---->  trains.duckdb
-       |
-       +-- stg_plan          the timetable
-       +-- stg_changes       what really happened
-       +-- fct_stop_delays   the two joined, with the delay worked out
 ```
 
-### Collecting
+The API answers two questions and I need both. The plan is the timetable,
+what time a train is due, and it only changes once an hour. The changes are
+what actually happened, and they change constantly.
 
-The API answers two different questions and both are needed.
+Neither is useful on its own. The plan does not know about delays, and the
+changes usually give a new time without saying what the old one was. The
+delay only appears when you put them together.
 
-**The plan** is the timetable: what time a train is due. It changes once an
-hour, so it is asked for once an hour.
-
-**The changes** are what actually happened: the new arrival time. This is
-asked for every two minutes because it keeps changing.
-
-Neither is any use alone. The plan does not know about delays. The changes
-usually give a new time without saying what the old one was. The delay only
-appears when the two are put side by side.
-
-### Saving replies as they arrive
-
-`collect.py` saves the answer from the API exactly as it came, without
-reading it. That looks lazy and is on purpose.
-
-Reading the data is where mistakes happen. Early on, a disruption message was
-read as a cancellation, which marked 1,349 trains as cancelled when they had
-actually run. Fixing it took one command, because every original reply was
-still on disk:
+`collect.py` saves the reply from the API without reading it. I did it that
+way because reading data is where I make mistakes. Early on I read a
+disruption message as a cancellation and marked 1,349 trains as cancelled
+when they had actually run. Fixing that was one command, because the
+original replies were still there:
 
 ```
 python parse.py --rebuild
 ```
 
-If the collector had read the replies and saved only the result, those trains
-would have been wrong forever.
+The same train gets fetched again every two minutes, so one stop shows up in
+hundreds of files with a newer guess each time. Only the last one counts.
+Then the timetable is joined to the changes, keeping every planned train even
+if it never shows up in the changes, because that means it ran on time.
 
-### Working out the delay
-
-The same train is fetched again every two minutes, so one stop shows up in
-hundreds of files, each with a newer guess. Only the last one is true.
-
-After that the timetable is joined to the changes. The join keeps every
-planned train, including the ones that never appear in the changes at all,
-because that silence means the train ran on time. Dropping them would delete
-every punctual train and make the numbers look far worse than they are.
-
-A cancelled train gets no delay. It was not late, it never ran.
+A cancelled train gets no delay at all. It was not late, it never ran.
 
 ## Running it
 
 You need a free API key from
-[developers.deutschebahn.com](https://developers.deutschebahn.com). Create an
-account, create an application, then subscribe that application to the
-Timetables API and pick the free plan. Creating the application is not enough
-on its own, the subscription is a separate step.
+[developers.deutschebahn.com](https://developers.deutschebahn.com). Make an
+account, make an application, then subscribe that application to the
+Timetables API on the free plan. The subscription is a separate step and it
+took me a while to notice.
 
 ```
 pip install -r requirements.txt
@@ -114,10 +87,9 @@ cp .env.example .env
 Put your client id and secret in `.env`, then:
 
 ```
-python collect.py        collect, leave it running
+python collect.py        leave this running
 python parse.py          build the table
 python health.py         see what was collected and what is missing
-python make_charts.py    redraw the charts
 ```
 
 For the dbt models:
@@ -129,63 +101,30 @@ dbt run
 dbt test
 ```
 
-## Checking the collection
+## Checking it is still collecting
 
 A collector that stops quietly is worse than one that crashes, because the
-numbers built on top still look fine.
+numbers still look fine afterwards. `health.py` shows every hour, how many
+rounds ran, and how many records came back.
 
-`health.py` shows every hour since collection started, how many rounds ran,
-and how many records arrived. It counts records rather than successful
-requests, because a reply can arrive with status 200 and hold nothing at all.
+It counts records instead of successful requests. While I was looking for a
+data source I found one that answered every request with a valid reply, a
+fresh timestamp, and no trains in it. Checking only the status code would
+have told me everything was fine while I saved nothing.
 
-That is not a made up worry. While looking for a data source, one feed
-answered every request successfully, with a valid reply and a fresh
-timestamp, and no trains inside. A program checking only whether requests
-succeeded would have reported everything was fine while saving nothing.
-
-Collection so far is 2,655 rounds out of 2,820 expected. All the missing
-hours are from one afternoon before the laptop was set not to sleep. Since
-then it has not missed an hour.
+So far 2,655 rounds out of 2,820. The missing hours are all from one
+afternoon before I stopped the laptop sleeping.
 
 ## Tests
 
-Two kinds, and they catch different things.
-
 ```
-python -m pytest         29 tests, on every push
-cd dbt && dbt test        8 tests, on the collected data
+python -m pytest         29 tests, run on every push
+cd dbt && dbt test        8 tests, run on the collected data
 ```
 
-The python tests check the code: that a cancelled train gets no delay, that
-the join never loses a planned train, that a delay over midnight is fifteen
-minutes and not a negative day.
+The python tests check the code. The dbt tests check the data, like no two
+rows describing the same stop, or a delay so large it has to be a misread
+time.
 
-The dbt tests check the data itself: that no two rows describe the same stop,
-that the columns everything depends on are filled in, that no delay is so
-large it must be a misread time.
-
-Both are needed. Every python test passed while the cancellation bug was in
-the data, because they test the logic, not what the logic was fed.
-
-The dbt tests need the collected files, so they run on the machine holding
-the data. The python tests run in GitHub Actions on every push.
-
-## Files
-
-```
-collect.py        asks the API and saves the replies
-parse.py          turns saved replies into a table
-health.py         shows what was collected and what is missing
-make_charts.py    draws the charts above
-queries.sql       questions, as plain SQL
-ask.py            runs those questions
-stations.txt      which stations to watch
-dbt/              the same work as models, with tests
-data/             the saved replies, about 150 MB a day
-```
-
-## Next
-
-- Schedule the whole thing with Airflow
-- A page showing punctuality per station per day
-- Predict how late a train will be at its next stop
+I need both. All the python tests passed the whole time the cancellation bug
+was there, because they test the logic and not what the logic was given.
