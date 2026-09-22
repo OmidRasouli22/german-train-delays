@@ -71,6 +71,22 @@ if it never shows up in the changes, because that means it ran on time.
 
 A cancelled train gets no delay at all. It was not late, it never ran.
 
+## Dashboard
+
+```
+streamlit run dashboard.py
+```
+
+Punctuality by station, delay through the day, by kind of train, and a table
+per day. It reads small summary files in `dashboard_data` rather than the
+collected replies, so it runs without the full archive.
+
+```
+python export_dashboard_data.py
+```
+
+rebuilds those summaries after new data comes in.
+
 ## Running it
 
 You need a free API key from

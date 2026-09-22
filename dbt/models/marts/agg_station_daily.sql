@@ -1,12 +1,8 @@
 -- One row per station per day.
 --
 -- This is what a dashboard reads. Counting from the stops table every time a
--- chart loads is wasteful, and the numbers here are the ones people actually
--- ask for.
---
--- Punctuality is shown twice. The official measure counts a train as on time
--- under six minutes and ignores cancelled trains. The second one counts a
--- cancelled train as not on time, which is closer to what a passenger got.
+-- chart loads is wasteful
+
 
 select
     service_date,
