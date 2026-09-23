@@ -2,7 +2,7 @@
 
 Deutsche Bahn shows what its trains are doing right now, and a few minutes
 later that information is gone. I wanted to know how late trains actually
-are, so I started saving it every two minutes.
+are, so I saved it every two minutes for a week.
 
 Eight stations in the south: Freiburg, Stuttgart, Karlsruhe, Mannheim,
 Munich, Nuremberg, Ulm, Heidelberg.
@@ -15,20 +15,20 @@ morning. Late trains make the next train late, and it only resets overnight.
 
 ![Delay by hour](charts/delay_by_hour.png)
 
-Which station you are at matters more than I expected. Freiburg is under
-three minutes on average, Munich is eight.
+Which station you are at matters more than I expected. Freiburg is on time
+80% of the time, Stuttgart 64%.
 
 ![Delay by station](charts/delay_by_station.png)
 
-Most trains are fine though. Three quarters are within five minutes. It is
-the four percent over half an hour that people remember.
+Most trains are fine though. Nearly three quarters are within five minutes.
+It is the four percent over half an hour that people remember.
 
 ![How delays are spread](charts/delay_spread.png)
 
-Night trains are the worst by a long way, around half an hour on average.
-ICE is about six minutes, S-Bahn under three.
+Night trains and long distance services are worst, around twenty minutes on
+average. S-Bahn trains stay under three.
 
-From 22,930 stops between 17 and 21 September 2026.
+From 36,314 stops collected between 17 and 23 September 2026.
 
 ## How it works
 
@@ -131,8 +131,13 @@ data source I found one that answered every request with a valid reply, a
 fresh timestamp, and no trains in it. Checking only the status code would
 have told me everything was fine while I saved nothing.
 
-So far 2,655 rounds out of 2,820. The missing hours are all from one
-afternoon before I stopped the laptop sleeping.
+4,005 rounds out of 4,170, so 96%. All the missing hours are from the first
+afternoon, before I stopped the laptop sleeping. After that it held 99.5%
+for five full days.
+
+There were also 37 replies that came back with status 200 and no trains in
+them, which is the same thing that made the first data source I tried
+useless.
 
 ## Tests
 
