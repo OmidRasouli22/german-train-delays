@@ -1,0 +1,30 @@
+# Airflow, cut down to what this project needs.
+#
+# The official compose file runs eight services. This runs one, using
+# LocalExecutor and SQLite, which is plenty for a pipeline with three tasks.
+#
+# The project folder is mounted at /project so the tasks can run the same
+# scripts you run by hand.
+
+services:
+  airflow:
+    build:
+      # Built from the project root so the image can pick up requirements.txt
+      context: ..
+      dockerfile: airflow/Dockerfile
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+      # Without this the webserver logs you out every few minutes.
+      AIRFLOW__WEBSERVER__SECRET_KEY: local-only-not-a-secret
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ..:/project
+    ports:
+      - "8090:8080"
+    command: standalone

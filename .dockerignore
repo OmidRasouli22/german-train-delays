@@ -1,0 +1,9 @@
+data/
+*.parquet
+*.duckdb
+.git/
+.venv/
+charts/
+dbt/target/
+dbt/logs/
+airflow/logs/
